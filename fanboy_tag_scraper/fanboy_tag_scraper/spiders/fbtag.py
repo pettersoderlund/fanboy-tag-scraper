@@ -6,6 +6,7 @@ import logging
 import scrapy_mysql_pipeline
 import html2text
 import bs4
+import argparse
 
 class FbtagSpider(scrapy.Spider):
     name = "fbtag"
@@ -54,14 +55,23 @@ class FbtagSpider(scrapy.Spider):
         return discussion_links
     
     def parse(self, response):
+        # Possible sorts additional to default: 
+        # top
+        # newest
+        # oldest
+
         j_data = self.getFbtagJsonInfo(response)
-        #logging.log(level="DEBUG", msg=j_data)
-        #logging.debug(('PETTER DEBUG : json data::: \n: ', j_data))
-        tl = self.getDiscussionLinks(j_data, tag_filter=[3,8])
-        #yield {'threads' : tl}
-        #logging.debug(tl)
-        # check which tags to decide which discussions to scrape 
-        for url in tl: 
+
+
+        # filter from options
+        tag_filter = getattr(self,'tag_filter','3,8')
+        #parse filter string
+        tag_filter_list = tag_filter.split(',')
+        #convert to int
+        tag_filter_list_int = list(map(int, tag_filter_list))
+        discussion_links = self.getDiscussionLinks(j_data, tag_filter=tag_filter_list_int)
+
+        for url in discussion_links: 
             yield scrapy.Request(url, callback=self.parseDiscussion)
             
         # pagination
@@ -69,16 +79,16 @@ class FbtagSpider(scrapy.Spider):
         discussions_next_url = response.xpath("//div[@class='container']/a[contains(text(), 'Next Page')]/@href").extract_first()
         if(discussions_next_url is not None):
             discussions_next_page_deep = discussions_next_url.split('=')[-1]
-            discussion_max_deep = 3
+            discussion_max_deep = int(getattr(self,'discussion_list_deep',3))
+
             if(discussion_max_deep > int(discussions_next_page_deep)):
                 yield scrapy.Request(discussions_next_url, callback=self.parse)
             else: 
                 logging.debug(('Discussions list Max deep reached of ', discussion_max_deep, '. Will not parse ', discussions_next_url))
                 
     def parseDiscussion(self, response):
-        #pass
+
         data = self.getFbtagJsonInfo(response)
-        #logging.debug(data)
         
         for item in data['document']['included']:
             if(item['type'] == 'posts'):
@@ -120,7 +130,6 @@ class FbtagSpider(scrapy.Spider):
                         "inserted_time":datetime.now()
                           }
                 yield post
-
         
         # pagination
         # is there a next page ? 
@@ -128,7 +137,7 @@ class FbtagSpider(scrapy.Spider):
         next_url = response.xpath("//div[@class='container']/a[contains(text(), 'Next Page')]/@href").extract_first()
         if(next_url is not None):
             next_page_deep = next_url.split('=')[-1]
-            max_deep = 5
+            max_deep = int(getattr(self,'discussion_deep',3))
             if(max_deep > int(next_page_deep)):
                 yield scrapy.Request(next_url, callback=self.parseDiscussion)
             else: 
