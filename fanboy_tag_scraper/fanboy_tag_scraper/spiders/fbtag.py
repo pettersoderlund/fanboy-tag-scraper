@@ -89,7 +89,15 @@ class FbtagSpider(scrapy.Spider):
     def parseDiscussion(self, response):
 
         data = self.getFbtagJsonInfo(response)
-        
+
+        # Username mapping dict. Only user id specified in post object
+        users = {}
+        for item in data['document']['included']:
+            if(item['type'] == 'users'):
+                uid = item['id']
+                uname = item['attributes']['username']
+                users[uid] = uname
+
         for item in data['document']['included']:
             if(item['type'] == 'posts'):
                 
@@ -115,6 +123,7 @@ class FbtagSpider(scrapy.Spider):
                 
                 post = {"user_id": item['relationships']['user']['data']['id'],
                          "post_id": item['attributes']['id'],
+                         "user_name": users[item['relationships']['user']['data']['id']],
                          "post_number" : item['attributes']['number'],
                          "created_time_text" : item['attributes']['time'],
                          "created_time": post_created_datetime,
