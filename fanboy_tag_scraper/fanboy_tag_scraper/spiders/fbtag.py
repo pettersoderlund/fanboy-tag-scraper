@@ -7,6 +7,8 @@ import scrapy_mysql_pipeline
 import html2text
 import bs4
 import argparse
+import urllib.parse as urlparse
+from urllib.parse import urlencode
 
 class FbtagSpider(scrapy.Spider):
     name = "fbtag"
@@ -59,9 +61,16 @@ class FbtagSpider(scrapy.Spider):
         # top
         # newest
         # oldest
+        sort_order = getattr(self,'sort_order','default')
+        if(sort_order not in response.url and sort_order != 'default'):
+            yield scrapy.Request('https://fbtag.net/all?sort={sort}'.format(sort=sort_order), callback=self.parseDiscussionList)
+        else: 
+            yield scrapy.Request('https://fbtag.net/', callback=self.parseDiscussionList)
+  
+
+    def parseDiscussionList(self, response):
 
         j_data = self.getFbtagJsonInfo(response)
-
 
         # filter from options
         tag_filter = getattr(self,'tag_filter','3,8')
@@ -77,19 +86,33 @@ class FbtagSpider(scrapy.Spider):
         # pagination
         # parse the pages
         discussions_next_url = response.xpath("//div[@class='container']/a[contains(text(), 'Next Page')]/@href").extract_first()
+        sort_order = getattr(self,'sort_order','default')
         if(discussions_next_url is not None):
-            discussions_next_page_deep = discussions_next_url.split('=')[-1]
+
+            params = {'sort':sort_order}
+            url_parts = list(urlparse.urlparse(discussions_next_url))
+            query = dict(urlparse.parse_qsl(url_parts[4]))
+            query.update(params)
+            url_parts[4] = urlencode(query)
+            discussions_next_url_sorted = urlparse.urlunparse(url_parts)
+
+            discussions_next_page_deep = query['page']
+
             discussion_max_deep = int(getattr(self,'discussion_list_deep',3))
-
             if(discussion_max_deep > int(discussions_next_page_deep)):
-                yield scrapy.Request(discussions_next_url, callback=self.parse)
+                if(sort_order not in discussions_next_url and sort_order != 'default'):
+                    yield scrapy.Request(discussions_next_url_sorted, callback=self.parseDiscussionList)
+                else:
+                    yield scrapy.Request(discussions_next_url, callback=self.parseDiscussionList)
             else: 
-                logging.debug(('Discussions list Max deep reached of ', discussion_max_deep, '. Will not parse ', discussions_next_url))
-                
+                logging.debug(('Discussions list Max deep reached of ', discussion_max_deep, '. Will not parse '))
+                if(sort_order not in discussions_next_url and sort_order != 'default'):
+                    logging.debug(discussions_next_url_sorted)
+                else:
+                    logging.debug(discussions_next_url)
+
     def parseDiscussion(self, response):
-
         data = self.getFbtagJsonInfo(response)
-
         # Username mapping dict. Only user id specified in post object
         users = {}
         for item in data['document']['included']:

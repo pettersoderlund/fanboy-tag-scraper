@@ -21,7 +21,7 @@ I have tested to run this on cygwin on a windows machine and ubuntu.
 - Copy settings file and edit to your settings (cp settings.example.py settings.py)
 
 ## Usage
-scrapy crawl fbtag <-a tag_filter="3,8"> <-a discussion_list_deep=5> <-a discussion_deep=2>
+scrapy crawl fbtag <-a tag_filter="3,8"> <-a discussion_list_deep=5> <-a discussion_deep=2> <-a sort_order=oldest>
 
 Parameters explained: 
 ### tag_filter
@@ -50,5 +50,11 @@ How many pages to parse through in the discussion list navigation.
 ### discussion_deep
 How many pages to parse through in every discussion. 
 
-## Next steps
-I would like to implement sorting on the discussion list. 
+### sort_order
+Which order to parse the post list?
+Possible values: 
+- latest (default)
+- oldest
+- newest
+- top 
+
